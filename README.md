@@ -1,7 +1,8 @@
 # Trabalho-IA
 
+
 Informacoes sobre a pasta choi-yena:
-    
+
     -Sao basicamente as librarys que a gente estiver usando
     -sobre o nome: eu so botei um nome aleatorio de uma mina de um grupo de k-pop que eu gosto
     -Para instalar basta rodar o comando: "pip install -e ." o "-e" é para que a library instalada no python possa ser editada(ainda to lendo sobre isso de como deixa o projeto mais simples e direto pra instalar e editar)
