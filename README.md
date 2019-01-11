@@ -14,3 +14,6 @@ Informacoes sobre a pasta choi-yena:
             -basicamente oque eu fiz ate agora
             -na wrapper.py tem a classe que extende a classe mdp do professor(WIP)
             -na parameters.py tem os parametros que serao usados durante o codigo e dps testados usando o algoritimo genetico(WIP)
+
+
+play -r "python MyBot.py" -r "python MyBot.py" -b "halite.exe" --output-dir "output" -i 1

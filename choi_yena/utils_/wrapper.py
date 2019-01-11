@@ -1,0 +1,89 @@
+import logging
+
+from choi_yena import hlt
+from choi_yena.hendrick.mdp import MDP
+from . import parameters
+
+commands_ = ['n','s','e','w','o']
+
+# Completar a classe com a lista de estados, lista de rewards e a funcao T
+
+class Cell:
+
+     def __init__(self, ship, haliteAmount = 0):
+         self.haliteAmount = haliteAmount
+         self.ship = ship
+
+
+class HaliteGrid(MDP):
+
+    def __init__(self, game_map, me):
+        self.width = game_map.width
+        self.height = game_map.height
+        self.grid = self.convertMap(game_map)
+        super().__init__((0, 0), actlist=commands_, terminals=self.selectTerminals(), gamma= parameters.gamma)
+        self.setupStatesAndReward()
+
+    def T(self, state, action):
+        if action is None:
+            return [(0,state)]
+        else: 
+            return [(1, self.move(state,action))]
+
+    def convertMap(self, game_map):
+        cells = []
+        for y in range(self.height):
+            cellsCol = []
+            for x in range(self.width):
+                position = hlt.positionals.Position(x, y)
+                mapCell = game_map[position]
+                cellsCol.append(Cell(mapCell.ship is not None, mapCell.halite_amount))
+            cells.append(cellsCol)
+
+        return cells
+
+    def selectTerminals(self):
+        terminals = []
+        for y in range(self.height):
+            for x in range(self.width):
+                cell = self.grid[y][x]
+                if cell.haliteAmount > parameters.maxHaliteToMove and not cell.ship:
+                    terminals.append((y, x))
+
+        return terminals
+
+    def setupStatesAndReward(self):
+        for y in range(self.height):
+            for x in range(self.width):
+                self.reward[y, x] = (self.grid[y][x].haliteAmount - parameters.maxHaliteToMove) * 10
+                if not self.grid[y][x].ship:
+                    self.states.add((y, x))
+                
+
+        return
+    
+    def normalize(self, y, x):
+        return (y % self.height, x % self.width)
+
+    def move(self, state, direction):
+        if direction == 'n':
+            resultState = self.normalize(state[0], state[1] - 1)
+            return resultState if resultState in self.states else state
+        elif direction == 's':
+            resultState = self.normalize(state[0], state[1] + 1)
+            return resultState if resultState in self.states else state
+        elif direction == 'e':
+            resultState = self.normalize(state[0] + 1, state[1])
+            return resultState if resultState in self.states else state
+        elif direction == 'w':
+            resultState = self.normalize(state[0] - 1, state[1])
+            return resultState if resultState in self.states else state
+        elif direction == 'o':
+            return state
+
+def getBestChoice(mapCell,mdpResult):
+    tup = (mapCell.position.y, mapCell.position.x)
+    if mdpResult[tup] is None:
+        return 'o'
+    else:
+        return mdpResult[tup]
