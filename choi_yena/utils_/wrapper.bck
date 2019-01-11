@@ -10,19 +10,17 @@ commands_ = ['n','s','e','w','o']
 
 class Cell:
 
-     def __init__(self, x, y, has_ship, haliteAmount = 0):
+     def __init__(self, x, y, ship, haliteAmount = 0):
          self.x = x
          self.y = y
          self.haliteAmount = haliteAmount
-         self.has_ship = has_ship
+         self.ship = ship
 
 class HaliteGrid(MDP):
 
-    def __init__(self, game_map, ship, unsafe_positions):
-        self.ship = ship
-        self.unsafe_positions = unsafe_positions
-        self.width = parameters.viewDistance * 2 + 1
-        self.height = parameters.viewDistance * 2 + 1
+    def __init__(self, game_map, me):
+        self.width = game_map.width
+        self.height = game_map.height
         self.grid = self.convertMap(game_map)
         super().__init__((0, 0), actlist=commands_, terminals=self.selectTerminals(), gamma= parameters.gamma)
         self.setupStatesAndReward()
@@ -38,10 +36,16 @@ class HaliteGrid(MDP):
         for y in range(self.height):
             cellsCol = []
             for x in range(self.width):
-                position = hlt.positionals.Position((x - parameters.viewDistance) + self.ship.position.x, (y - parameters.viewDistance) + self.ship.position.y)
+                position = hlt.positionals.Position(x, y)
                 mapCell = game_map[position]
-                cellsCol.append(Cell(position.x, position.y, position in self.unsafe_positions, mapCell.halite_amount))
+                cellsCol.append(Cell(position.x, position.y, mapCell.ship is not None, mapCell.halite_amount))
             cells.append(cellsCol)
+
+        '''
+        for y in range(self.height):
+            for x in range(self.width):
+                logging.info("({}, {}): ({}, {}), ".format(x,y,cells[y][x].x, cells[y][x].y))
+        '''
 
         return cells
 
@@ -50,7 +54,7 @@ class HaliteGrid(MDP):
         for y in range(self.height):
             for x in range(self.width):
                 cell = self.grid[y][x]
-                if cell.haliteAmount > parameters.maxHaliteToMove and not cell.has_ship:
+                if cell.haliteAmount > parameters.maxHaliteToMove and not cell.ship:
                     terminals.append((y, x))
 
         return terminals
@@ -59,46 +63,33 @@ class HaliteGrid(MDP):
         for y in range(self.height):
             for x in range(self.width):
                 self.reward[y, x] = (self.grid[y][x].haliteAmount - parameters.maxHaliteToMove) * 10
-                if not self.grid[y][x].has_ship or (x, y) == (parameters.viewDistance, parameters.viewDistance):
-                    self.states.add((y, x))
+                self.states.add((y, x))
                 
 
         return
+    
+    def normalize(self, y, x):
+        return (y % self.height, x % self.width)
 
     def move(self, state, direction):
         if direction == 'n':
-            resultState = (state[0] - 1, state[1])
+            resultState = self.normalize(state[0] - 1, state[1])
             return resultState if resultState in self.states else state
         elif direction == 's':
-            resultState = (state[0] + 1, state[1])
+            resultState = self.normalize(state[0] + 1, state[1])
             return resultState if resultState in self.states else state
         elif direction == 'e':
-            resultState = (state[0], state[1] + 1)
+            resultState = self.normalize(state[0], state[1] + 1)
             return resultState if resultState in self.states else state
         elif direction == 'w':
-            resultState = (state[0], state[1] - 1)
+            resultState = self.normalize(state[0], state[1] - 1)
             return resultState if resultState in self.states else state
         elif direction == 'o':
             return state
 
-def convert(self, values):
-    return ((values[0] - parameters.viewDistance) + self.ship.position.x, (values[1] - parameters.viewDistance) + self.ship.position.y)
-
-def getBestChoice(ship,mdpResult):
-    tup = (parameters.viewDistance, parameters.viewDistance)
+def getBestChoice(mapCell,mdpResult):
+    tup = (mapCell.position.y, mapCell.position.x)
     if mdpResult[tup] is None:
         return 'o'
     else:
         return mdpResult[tup]
-
-def convertDirection(command):
-    if command == hlt.commands.NORTH:
-        return hlt.positionals.Direction.North
-    if command == hlt.commands.SOUTH:
-        return hlt.positionals.Direction.South
-    if command == hlt.commands.EAST:
-        return hlt.positionals.Direction.East
-    if command == hlt.commands.WEST:
-        return hlt.positionals.Direction.West
-    if command == hlt.commands.STAY_STILL:
-        return hlt.positionals.Direction.Still
