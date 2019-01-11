@@ -78,10 +78,15 @@ logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 
 ship_status = {}
 
-ships_collecting = []
+ships_priority = []
 
 def handleShipAI(ship):
     logging.info("Ship {} has {} halite.".format(ship.id, ship.halite_amount))
+
+    grid = wrapper.HaliteGrid(game_map,ship,unsafe_positions)
+    result = mdp.policy_iteration(grid)
+
+    data = wrapper.parseResult(ship,game_map,grid,result)
 
     if ship.id not in ship_status:
         ship_status[ship.id] = "exploring"
@@ -91,6 +96,7 @@ def handleShipAI(ship):
             ship_status[ship.id] = "exploring"
         else:
             move = game_map.naive_navigate(ship, me.shipyard.position)
+            unsafe_positions.append(ship.position.directional_offset(wrapper.convertDirection(move))) # Placeholder
             command_queue.append(ship.move(move))
             return
     elif ship.halite_amount >= parameters.maxHaliteToReturn:
@@ -99,20 +105,22 @@ def handleShipAI(ship):
     # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
     #   Else, collect halite.
 
-    grid = wrapper.HaliteGrid(game_map,ship,unsafe_positions)
-    result = mdp.policy_iteration(grid)
 
-    logging.info("\nResultado: {}".format(result))
-
-    direction = wrapper.getBestChoice(game_map[ship.position],result)
-    if direction == 'o':
-        ships_collecting.append(ship.id)
+    # Anti collision (TODO)
+    unsafe_positions.append(data['new_position'])
+    unsafe_positions.append(ship.position)
+    game_map[data['new_position']].mark_unsafe(ship) # Placeholder
+    if data['onTerminal']:
+        # Has priority
+        if not data['toTerminal']:
+            game_map[ship.position].mark_unsafe(ship) # Placeholder
+            ships_priority.remove(ship.id)
     else:
-        if ship.id in ships_collecting:
-            ships_collecting.remove(ship.id)
 
-    unsafe_positions.append(ship.position.directional_offset(wrapper.convertDirection(direction)))
-    command_queue.append(ship.move(direction))
+        if data['toTerminal']:
+            ships_priority.append(ship.id)
+    
+    command_queue.append(ship.move(data['command']))
 
 # TESTE
 '''
@@ -130,18 +138,18 @@ game.end_turn([])
 #-------
 
 def sortByPriority(item):
-    return item.id not in ships_collecting
+    return item.id not in ships_priority
 
 count = 0
 
 """ <<<Game Loop>>> """
 while True:
-    '''
+    
     count += 1
-    if count == 200:
+    if count == 50:
         logging.info("sleep")
         time.sleep(2)
-    '''
+    
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
 

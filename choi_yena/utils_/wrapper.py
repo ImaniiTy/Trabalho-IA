@@ -84,12 +84,16 @@ class HaliteGrid(MDP):
 def convert(self, values):
     return ((values[0] - parameters.viewDistance) + self.ship.position.x, (values[1] - parameters.viewDistance) + self.ship.position.y)
 
-def getBestChoice(ship,mdpResult):
+def parseResult(ship, game_map, mdp, mdpResult):
     tup = (parameters.viewDistance, parameters.viewDistance)
-    if mdpResult[tup] is None:
-        return 'o'
-    else:
-        return mdpResult[tup]
+
+    command = mdpResult[tup] if mdpResult[tup] is not None else 'o'
+    new_position = ship.position.directional_offset(convertDirection(command))
+
+    onTerminal = tup in mdp.terminals
+    toTerminal = game_map[new_position].halite_amount > parameters.maxHaliteToMove
+
+    return {"command": command, "new_position": new_position, "onTerminal": onTerminal, "toTerminal": toTerminal}
 
 def convertDirection(command):
     if command == hlt.commands.NORTH:
@@ -102,3 +106,4 @@ def convertDirection(command):
         return hlt.positionals.Direction.West
     if command == hlt.commands.STAY_STILL:
         return hlt.positionals.Direction.Still
+    return command

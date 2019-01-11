@@ -1,4 +1,4 @@
 viewDistance = 4
-maxHaliteToMove = 200
-maxHaliteToReturn = 900
+maxHaliteToMove = 150
+maxHaliteToReturn = 850
 gamma = .9
