@@ -23,44 +23,7 @@ from choi_yena.utils_ import parameters
 import logging
 import time
 
-'''
-def shipView(viewDistance, shipNeighborhoods):
-    for j in range(-1 * viewDistance, viewDistance + 1):
-        for i in range(-1 * viewDistance, viewDistance + 1):
-            shipNeighborhoods.append((i, j))
 
-def shipViewRelative(viewDistance, shipNeighborhoodRelative):
-    for j in range(-1 * viewDistance, viewDistance + 1):
-        for i in range(-1 * viewDistance, viewDistance + 1):
-            shipNeighborhoodRelative.append(ship.position + Position(i, j))
-
-shipNeighborhood = []
-shipNeighborhoodRelative = []
-shipView(3, shipNeighborhood)
-
-positionActions = shipNeighborhood
-
-shipNeighborhoodRelative = []
-shipViewRelative(3, shipNeighborhoodRelative)
-positionOptions = shipNeighborhoodRelative
-positionDict = {}
-haliteDict = {}
-
-#logging.info(f"{positionOptions}")
-#logging.info(f"{positionActions}")
-for n, direction in enumerate(positionActions):
-    positionDict[direction] = positionOptions[n]
-
-
-
-for direction in positionDict:
-    position = positionDict[direction]
-    haliteInPosition = game_map[position].halite_amount
-    haliteDict[direction] = haliteInPosition
-
-logging.info(f"{positionDict}")
-logging.info(f"{haliteDict}")
-'''
 
 """ <<<Game Begin>>> """
 
@@ -90,7 +53,7 @@ def handleShipAI(ship):
 
     if ship.id not in ship_status:
         ship_status[ship.id] = "exploring"
-    
+
     if ship_status[ship.id] == "returning":
         if ship.position == me.shipyard.position:
             ship_status[ship.id] = "exploring"
@@ -101,7 +64,7 @@ def handleShipAI(ship):
             return
     elif ship.halite_amount >= parameters.maxHaliteToReturn:
         ship_status[ship.id] = "returning"
-    
+
     # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
     #   Else, collect halite.
 
@@ -119,7 +82,7 @@ def handleShipAI(ship):
 
         if data['toTerminal']:
             ships_priority.append(ship.id)
-    
+
     command_queue.append(ship.move(data['command']))
 
 # TESTE
@@ -144,12 +107,12 @@ count = 0
 
 """ <<<Game Loop>>> """
 while True:
-    
+
     count += 1
     if count == 50:
         logging.info("sleep")
         time.sleep(2)
-    
+
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
 
@@ -180,7 +143,7 @@ while True:
         if me.has_ship(id):
             handleShipAI(me.get_ship(id))
             #ships.remove(me.get_ship(id))
-    
+
     while len(ships) > 0:
         handleShipAI(ships.pop())
     '''
