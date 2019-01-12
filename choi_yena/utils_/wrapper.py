@@ -1,5 +1,6 @@
 import logging
 
+from numpy import matrix
 from choi_yena import hlt
 from choi_yena.hendrick.mdp import MDP
 from . import parameters
@@ -20,12 +21,12 @@ class HaliteGrid(MDP):
 
     def __init__(self, game_map, ship, unsafe_positions):
         self.ship = ship
+        self.center = (self.ship.position.x, self.ship.position.y)
         self.unsafe_positions = unsafe_positions
-        self.width = parameters.viewDistance * 2 + 1
-        self.height = parameters.viewDistance * 2 + 1
-        self.grid = self.convertMap(game_map)
-        super().__init__((0, 0), actlist=commands_, terminals=self.selectTerminals(), gamma= parameters.gamma)
-        self.setupStatesAndReward()
+        self.width = self.height = parameters.viewDistance * 2 + 1
+        self.ship_vision = self.constrain_map(game_map)
+        super().__init__((0, 0), actlist=commands_, terminals=None, gamma=parameters.gamma)
+        self.terminals = self.setup_data()
 
     def T(self, state, action):
         if action is None:
@@ -33,57 +34,60 @@ class HaliteGrid(MDP):
         else: 
             return [(1, self.move(state,action))]
 
-    def convertMap(self, game_map):
-        cells = []
-        for y in range(self.height):
-            cellsCol = []
-            for x in range(self.width):
-                position = hlt.positionals.Position((x - parameters.viewDistance) + self.ship.position.x, (y - parameters.viewDistance) + self.ship.position.y)
-                mapCell = game_map[position]
-                cellsCol.append(Cell(position.x, position.y, position in self.unsafe_positions, mapCell.halite_amount))
-            cells.append(cellsCol)
+    def constrain_map(self, map_):
+        constraint = [[-10000 for _ in range(self.width)] for _ in range(self.height)]
 
-        return cells
+        for i, row in enumerate(constraint):
+            for j, _ in enumerate(row):
+                global_position = self.to_global(i,j)
+                if global_position not in self.unsafe_positions:
+                    row[j] = map_[global_position[0]][global_position[1]]
+        
+        logging.info("\n{}".format(matrix(constraint)))
+        return constraint
 
-    def selectTerminals(self):
+    def setup_data(self):
         terminals = []
-        for y in range(self.height):
-            for x in range(self.width):
-                cell = self.grid[y][x]
-                if cell.haliteAmount > parameters.maxHaliteToMove and not cell.has_ship:
-                    terminals.append((y, x))
+        
+        for i, row in enumerate(self.ship_vision):
+            for j, cell in enumerate(row):
+                if cell is not None:
+                    if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
+                        self.reward[i, j] = 10000
+                    else:
+                        self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
+                    self.states.add((i, j))
 
+                    if cell > parameters.maxHaliteToMove:
+                        terminals.append((i, j))
+                else:
+                    self.reward[i, j] = 0
         return terminals
-
-    def setupStatesAndReward(self):
-        for y in range(self.height):
-            for x in range(self.width):
-                self.reward[y, x] = (self.grid[y][x].haliteAmount - parameters.maxHaliteToMove) * 10
-                if not self.grid[y][x].has_ship or (x, y) == (parameters.viewDistance, parameters.viewDistance):
-                    self.states.add((y, x))
-                
-
-        return
 
     def move(self, state, direction):
         if direction == 'n':
-            resultState = (state[0] - 1, state[1])
+            resultState = (state[0], state[1] - 1)
             return resultState if resultState in self.states else state
         elif direction == 's':
-            resultState = (state[0] + 1, state[1])
-            return resultState if resultState in self.states else state
-        elif direction == 'e':
             resultState = (state[0], state[1] + 1)
             return resultState if resultState in self.states else state
+        elif direction == 'e':
+            resultState = (state[0] + 1, state[1])
+            return resultState if resultState in self.states else state
         elif direction == 'w':
-            resultState = (state[0], state[1] - 1)
+            resultState = (state[0] - 1, state[1])
             return resultState if resultState in self.states else state
         elif direction == 'o':
             return state
 
-def convert(self, values):
-    return ((values[0] - parameters.viewDistance) + self.ship.position.x, (values[1] - parameters.viewDistance) + self.ship.position.y)
+    def to_global(self, relative_x, relative_y):
+        global_x, global_y = (relative_x - parameters.viewDistance) + self.center[0], (relative_y - parameters.viewDistance) + self.center[1]
+        nomalized_x, nomalized_y = global_x % hlt.constants.HEIGHT, global_y % hlt.constants.WIDTH
 
+        return (nomalized_x, nomalized_y)
+
+
+# Utility functions
 def parseResult(ship, game_map, mdp, mdpResult):
     tup = (parameters.viewDistance, parameters.viewDistance)
 
@@ -107,3 +111,6 @@ def convertDirection(command):
     if command == hlt.commands.STAY_STILL:
         return hlt.positionals.Direction.Still
     return command
+
+def to_tuple(position):
+    return (position.x, position.y)

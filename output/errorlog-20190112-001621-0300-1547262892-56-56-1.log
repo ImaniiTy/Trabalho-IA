@@ -1,0 +1,23 @@
+
+Turn 10
+================================================================
+warning: entity 5 was directed to use 11 halite to move east, but only 9 halite was available
+At command 5 of 5:
+    3   m 9 w
+    4   m 7 w
+>>> 5   m 5 e
+
+warning: owned entities 1, 5 collided on cell (43, 29) as the result of moves on this turn
+At command 2 of 5:
+    1   m 3 n
+>>> 2   m 1 s
+    3   m 9 w
+    4   m 7 w
+
+
+Turn 200
+================================================================
+error: timed out after 2000 ms (when reading string)
+Last input received was:
+
+

@@ -22,6 +22,7 @@ from choi_yena.utils_ import parameters
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 import time
+import numpy as np
 
 
 
@@ -44,44 +45,43 @@ ship_status = {}
 ships_priority = []
 
 def handleShipAI(ship):
-    logging.info("Ship {} has {} halite.".format(ship.id, ship.halite_amount))
+    if ship.id not in ship_status:
+        ship_status[ship.id] = "exploring"
 
-    grid = wrapper.HaliteGrid(game_map,ship,unsafe_positions)
+    unsafe_positions.remove(wrapper.to_tuple(ship.position))
+    # Decision making
+    grid = wrapper.HaliteGrid(simplified_map,ship,unsafe_positions)
     result = mdp.policy_iteration(grid)
 
     data = wrapper.parseResult(ship,game_map,grid,result)
-
-    if ship.id not in ship_status:
-        ship_status[ship.id] = "exploring"
 
     if ship_status[ship.id] == "returning":
         if ship.position == me.shipyard.position:
             ship_status[ship.id] = "exploring"
         else:
             move = game_map.naive_navigate(ship, me.shipyard.position)
-            unsafe_positions.append(ship.position.directional_offset(wrapper.convertDirection(move))) # Placeholder
-            command_queue.append(ship.move(move))
-            return
+            data['new_position'] = ship.position.directional_offset(move)
+            data['command'] = choi_yena.hlt.positionals.Direction.convert(move)
     elif ship.halite_amount >= parameters.maxHaliteToReturn:
         ship_status[ship.id] = "returning"
 
-    # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
-    #   Else, collect halite.
+    # Anti-Colision
+    unsafe_positions.append(wrapper.to_tuple(data['new_position']))
+    game_map[data['new_position']].mark_unsafe(ship)
 
-
-    # Anti collision (TODO)
-    unsafe_positions.append(data['new_position'])
-    unsafe_positions.append(ship.position)
-    game_map[data['new_position']].mark_unsafe(ship) # Placeholder
     if data['onTerminal']:
         # Has priority
         if not data['toTerminal']:
-            game_map[ship.position].mark_unsafe(ship) # Placeholder
-            ships_priority.remove(ship.id)
+            if ship.id in ships_priority:
+                ships_priority.remove(ship.id)
     else:
-
         if data['toTerminal']:
             ships_priority.append(ship.id)
+
+    # Logging area
+    #logging.info("\n\nResult: {}".format(result))
+    logging.info("Ship {} command: {} actual position: {} new position: {}".format(ship.id, data['command'], ship.position, data['new_position']))
+    logging.info(unsafe_positions)
 
     command_queue.append(ship.move(data['command']))
 
@@ -100,6 +100,14 @@ game.end_turn([])
 '''
 #-------
 
+def fetch_enemy():
+    enemy_ships_ = []
+    for player in game.players.values():
+        if player.id != me.id:
+            enemy_ships_.extend(player.get_ships())
+
+    return enemy_ships_
+
 def sortByPriority(item):
     return item.id not in ships_priority
 
@@ -109,7 +117,7 @@ count = 0
 while True:
 
     count += 1
-    if count == 50:
+    if count == 200:
         logging.info("sleep")
         time.sleep(2)
 
@@ -121,33 +129,32 @@ while True:
     # You extract player metadata and the updated map metadata here for convenience.
     me = game.me
     game_map = game.game_map
+    simplified_map = [[row[i].halite_amount for row in game_map._cells] for i in range(len(game_map._cells[0]))]
+    #logging.info(np.matrix(simplified_map))
 
 
 
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
+
     command_queue = []
-    unsafe_positions = []
 
-    #logging.info(sorted(result.keys(), key=lambda x: x[1]))
+    my_ships = me.get_ships()
+    enemy_ships = fetch_enemy()
 
-    ships = me.get_ships()
-    ships.sort(key= sortByPriority)
+    my_ships.sort(key = sortByPriority)
 
-    for ship in ships:
+    unsafe_positions = [wrapper.to_tuple(ship.position) for ship in enemy_ships + my_ships]
+
+    # Remover quando fizer o codigo de retorno
+    for ship in enemy_ships + my_ships:
+        game_map[ship.position].mark_unsafe(ship)
+    #---------------------------------
+
+    # Handle ship AI
+    for ship in my_ships:
         handleShipAI(ship)
 
-    '''
-    while len(ships_collecting) > 0:
-        id = ships_collecting.pop()
-        if me.has_ship(id):
-            handleShipAI(me.get_ship(id))
-            #ships.remove(me.get_ship(id))
-
-    while len(ships) > 0:
-        handleShipAI(ships.pop())
-    '''
-    logging.info([(p.x, p.y) for p in unsafe_positions])
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
     if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
