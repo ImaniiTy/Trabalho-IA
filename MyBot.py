@@ -17,6 +17,7 @@ import random
 from choi_yena.utils_ import wrapper
 from choi_yena.hendrick import mdp
 from choi_yena.utils_ import parameters
+from choi_yena.utils_ import quadrants
 
 # Logging allows you to save messages for yourself. This is required because the regular STDOUT
 #   (print statements) are reserved for the engine-bot communication.
@@ -50,7 +51,12 @@ def handleShipAI(ship):
 
     unsafe_positions.remove(wrapper.to_tuple(ship.position))
     # Decision making
+    logging.info(quadrant)
+        
+        
+    
     grid = wrapper.HaliteGrid(simplified_map,ship,unsafe_positions)
+    #modificado
     result = mdp.policy_iteration(grid)
 
     data = wrapper.parseResult(ship,game_map,grid,result)
@@ -130,6 +136,7 @@ while True:
     me = game.me
     game_map = game.game_map
     simplified_map = [[row[i].halite_amount for row in game_map._cells] for i in range(len(game_map._cells[0]))]
+    quadrant = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
     #logging.info(np.matrix(simplified_map))
 
 

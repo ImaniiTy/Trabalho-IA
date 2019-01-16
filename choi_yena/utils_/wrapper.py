@@ -9,14 +9,6 @@ commands_ = ['n','s','e','w','o']
 
 # Completar a classe com a lista de estados, lista de rewards e a funcao T
 
-class Cell:
-
-     def __init__(self, x, y, has_ship, haliteAmount = 0):
-         self.x = x
-         self.y = y
-         self.haliteAmount = haliteAmount
-         self.has_ship = has_ship
-
 class HaliteGrid(MDP):
 
     def __init__(self, game_map, ship, unsafe_positions):
@@ -51,17 +43,14 @@ class HaliteGrid(MDP):
         
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
-                if cell is not None:
-                    if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
-                        self.reward[i, j] = 10000
-                    else:
-                        self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
-                    self.states.add((i, j))
-
-                    if cell > parameters.maxHaliteToMove:
-                        terminals.append((i, j))
+                if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
+                    self.reward[i, j] = 10000
                 else:
-                    self.reward[i, j] = 0
+                    self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
+                self.states.add((i, j))
+
+                if cell > parameters.maxHaliteToMove:
+                    terminals.append((i, j))
         return terminals
 
     def move(self, state, direction):
