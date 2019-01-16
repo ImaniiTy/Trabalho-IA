@@ -17,8 +17,8 @@ class HaliteGrid(MDP):
         self.unsafe_positions = unsafe_positions
         self.width = self.height = parameters.viewDistance * 2 + 1
         self.ship_vision = self.constrain_map(game_map)
-        super().__init__((0, 0), actlist=commands_, terminals=None, gamma=parameters.gamma)
-        self.terminals = self.setup_data()
+        self.ship_quadrant = (int(self.center[0] / (len(game_map) / 4)), int(self.center[1] / (len(game_map) / 4)))
+        super().__init__((0, 0), actlist=commands_, terminals=[], gamma=parameters.gamma)
 
     def T(self, state, action):
         if action is None:
@@ -32,26 +32,13 @@ class HaliteGrid(MDP):
         for i, row in enumerate(constraint):
             for j, _ in enumerate(row):
                 global_position = self.to_global(i,j)
-                if global_position not in self.unsafe_positions:
-                    row[j] = map_[global_position[0]][global_position[1]]
+                row[j] = map_[global_position[0]][global_position[1]]
         
         logging.info("\n{}".format(matrix(constraint)))
         return constraint
 
-    def setup_data(self):
-        terminals = []
-        
-        for i, row in enumerate(self.ship_vision):
-            for j, cell in enumerate(row):
-                if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
-                    self.reward[i, j] = 10000
-                else:
-                    self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
-                self.states.add((i, j))
-
-                if cell > parameters.maxHaliteToMove:
-                    terminals.append((i, j))
-        return terminals
+    def setup_data(self):  
+        raise NotImplementedError
 
     def move(self, state, direction):
         if direction == 'n':
@@ -74,6 +61,34 @@ class HaliteGrid(MDP):
         nomalized_x, nomalized_y = global_x % hlt.constants.HEIGHT, global_y % hlt.constants.WIDTH
 
         return (nomalized_x, nomalized_y)
+
+class VisionGrid(HaliteGrid):
+
+    def __init__(self, game_map, ship, unsafe_positions):
+        super().__init__(game_map, ship, unsafe_positions)
+        self.setup_data()
+
+    def setup_data(self):
+        for i, row in enumerate(self.ship_vision):
+            for j, cell in enumerate(row):
+                if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
+                    self.reward[i, j] = 10000
+                elif self.to_global(i,j) in self.unsafe_positions:
+                    self.reward[i, j] = -10000
+                else:
+                    self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
+                self.states.add((i, j))
+
+                if cell > parameters.maxHaliteToMove:
+                    self.terminals.append((i, j))
+class QuadrantGrid(HaliteGrid):
+    
+    def __init__(self, game_map, ship, unsafe_positions):
+        super().__init__(game_map,ship,unsafe_positions)
+        self.setup_data()
+
+    def setup_data(self):
+        return
 
 
 # Utility functions

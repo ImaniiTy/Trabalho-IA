@@ -7,12 +7,6 @@ import choi_yena.hlt
 # This library contains constant values.
 from choi_yena.hlt import constants
 
-# This library contains direction metadata to better interface with the game.
-from choi_yena.hlt.positionals import Direction
-from choi_yena.hlt.positionals import Position
-# This library allows you to generate random numbers.
-import random
-
 # Your library
 from choi_yena.utils_ import wrapper
 from choi_yena.hendrick import mdp
@@ -23,7 +17,6 @@ from choi_yena.utils_ import quadrants
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 import time
-import numpy as np
 
 
 
@@ -51,11 +44,8 @@ def handleShipAI(ship):
 
     unsafe_positions.remove(wrapper.to_tuple(ship.position))
     # Decision making
-    logging.info(quadrant)
         
-        
-    
-    grid = wrapper.HaliteGrid(simplified_map,ship,unsafe_positions)
+    grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions)
     #modificado
     result = mdp.policy_iteration(grid)
 
@@ -136,7 +126,7 @@ while True:
     me = game.me
     game_map = game.game_map
     simplified_map = [[row[i].halite_amount for row in game_map._cells] for i in range(len(game_map._cells[0]))]
-    quadrant = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
+    #quadrant = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
     #logging.info(np.matrix(simplified_map))
 
 
