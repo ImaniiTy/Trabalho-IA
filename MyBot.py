@@ -44,29 +44,32 @@ def handleShipAI(ship):
         ship_status[ship.id] = "exploring"
 
     unsafe_positions.remove(wrapper.to_tuple(ship.position))
-    # Decision making
-
-    grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions)
-    if len(grid.terminals) == 0:
-        grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions)
-
-    result = mdp.policy_iteration(grid)
-
-    data = wrapper.parseResult(ship,game_map,grid,result)
 
     if ship_status[ship.id] == "returning":
         if ship.position == me.shipyard.position:
             ship_status[ship.id] = "exploring"
-        else:
-            move = game_map.naive_navigate(ship, me.shipyard.position)
-            data['new_position'] = ship.position.directional_offset(move)
-            data['command'] = choi_yena.hlt.positionals.Direction.convert(move)
     elif ship.halite_amount >= parameters.maxHaliteToReturn:
         ship_status[ship.id] = "returning"
+    # Decision making
+    grid = None
+
+    # Decide qual tipo de MDP usar
+    if ship_status[ship.id] == "returning":
+        logging.info("Returning")
+        grid = wrapper.ReturnGrid(simplified_map, ship, unsafe_positions, wrapper.to_tuple(me.shipyard.position))
+    else:
+        grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions)
+        if len(grid.terminals) == 0:
+            grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions)
+
+    # Calcula a MDP
+    result = mdp.policy_iteration(grid)
+
+    # Analiza o resultado da MDP e retorna as informacoe usadas no jogo
+    data = wrapper.parseResult(ship,game_map,grid,result)
 
     # Anti-Colision
     unsafe_positions.append(wrapper.to_tuple(data['new_position']))
-    game_map[data['new_position']].mark_unsafe(ship)
 
     if data['onTerminal']:
         # Has priority
@@ -78,9 +81,8 @@ def handleShipAI(ship):
             ships_priority.append(ship.id)
 
     # Logging area
-    #logging.info("\n\nResult: {}".format(result))
+    
     logging.info("Ship {} command: {} actual position: {} new position: {}".format(ship.id, data['command'], ship.position, data['new_position']))
-    #logging.info("Time: {}".format(time2 - time1))
 
     command_queue.append(ship.move(data['command']))
 
@@ -131,7 +133,6 @@ while True:
     simplified_map = [[row[i].halite_amount for row in game_map._cells] for i in range(len(game_map._cells[0]))]
     quadrant_map = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
 
-
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
 
@@ -144,19 +145,23 @@ while True:
 
     unsafe_positions = [wrapper.to_tuple(ship.position) for ship in enemy_ships + my_ships]
 
-    # Remover quando fizer o codigo de retorno
-    for ship in enemy_ships + my_ships:
-        game_map[ship.position].mark_unsafe(ship)
-    #---------------------------------
-
-    # Handle ship AI
-    for ship in my_ships:
-        handleShipAI(ship)
-
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
     if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
+        unsafe_positions.append(wrapper.to_tuple(me.shipyard.position))
         command_queue.append(me.shipyard.spawn())
+
+    # Handle ship AI
+    time1 = time.time()
+    for ship in my_ships:
+        
+        handleShipAI(ship)
+        
+        
+        
+    time2 = time.time()
+
+    logging.info("Time: {}".format(time2 - time1))
 
     # Send your moves back to the game environment, ending this turn.
     game.end_turn(command_queue)

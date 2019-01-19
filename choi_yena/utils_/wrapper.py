@@ -62,6 +62,12 @@ class HaliteGrid(MDP):
 
         return (nomalized_x, nomalized_y)
 
+    def tuple_to_global(self, relative):
+        return self.to_global(relative[0], relative[1])
+    
+    def get_distance(self, from_, to):
+        return abs(from_[0] - to[0]) + abs(from_[1] - to[1])
+
 class VisionGrid(HaliteGrid):
 
     def __init__(self, game_map, ship, unsafe_positions):
@@ -94,9 +100,9 @@ class QuadrantGrid(HaliteGrid):
         logging.info("Objective: {}".format(objective))
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
-                if (i, j) == objective or ((i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount):
+                if (i, j) == objective or ((i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount):
                     self.reward[i, j] = 10000
-                elif self.to_global(i,j) in self.unsafe_positions:
+                elif self.to_global(i, j) in self.unsafe_positions:
                     self.reward[i, j] = -10000
                 else:
                     self.reward[i, j] = cell * -parameters.reward_multiplier
@@ -137,11 +143,40 @@ class QuadrantGrid(HaliteGrid):
 
         return edges
 
-    def get_distance(self, from_, to):
-        return abs(from_[0] - to[0]) + abs(from_[1] - to[1])
-
     def quadrant_to_global(self, quadrant):
         return ((quadrant[0] * len(self.quadrant_map) + parameters.viewDistance) % self.map_size, (quadrant[1] * len(self.quadrant_map) + parameters.viewDistance) % self.map_size)
+
+class ReturnGrid(HaliteGrid):
+    def __init__(self, game_map, ship, unsafe_positions, drop_location):
+        self.drop_location = drop_location
+        super().__init__(game_map, ship, unsafe_positions)
+        self.setup_data()
+
+    def setup_data(self):
+        objective = self.get_objective()
+        logging.info("Unsafe: {}".format(self.unsafe_positions))
+        for i, row in enumerate(self.ship_vision):
+            for j, cell in enumerate(row):
+                if self.to_global(i, j) in self.unsafe_positions:
+                    self.reward[i, j] = -10000
+                elif (i, j) == objective:
+                    self.reward[i, j] = 10000
+                else:
+                    self.reward[i, j] = cell * -parameters.reward_multiplier
+                self.states.add((i, j))
+
+        self.terminals.append(objective)
+
+    def get_objective(self):
+        objective = (0, 0)
+        for i, row in enumerate(self.ship_vision):
+            for j, _ in enumerate(row):
+                if self.get_distance(self.to_global(i, j), self.drop_location) < self.get_distance(self.tuple_to_global(objective), self.drop_location):
+                    objective = (i, j)
+        
+        return objective
+
+
 # Utility functions
 def parseResult(ship, game_map, mdp, mdpResult):
     tup = (parameters.viewDistance, parameters.viewDistance)
