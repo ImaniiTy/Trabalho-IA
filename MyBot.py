@@ -17,6 +17,7 @@ from choi_yena.utils_ import quadrants
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 import time
+from numpy import matrix
 
 
 
@@ -44,9 +45,11 @@ def handleShipAI(ship):
 
     unsafe_positions.remove(wrapper.to_tuple(ship.position))
     # Decision making
-        
+
     grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions)
-    #modificado
+    if len(grid.terminals) == 0:
+        grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions)
+
     result = mdp.policy_iteration(grid)
 
     data = wrapper.parseResult(ship,game_map,grid,result)
@@ -77,7 +80,7 @@ def handleShipAI(ship):
     # Logging area
     #logging.info("\n\nResult: {}".format(result))
     logging.info("Ship {} command: {} actual position: {} new position: {}".format(ship.id, data['command'], ship.position, data['new_position']))
-    logging.info(unsafe_positions)
+    #logging.info("Time: {}".format(time2 - time1))
 
     command_queue.append(ship.move(data['command']))
 
@@ -113,7 +116,7 @@ count = 0
 while True:
 
     count += 1
-    if count == 200:
+    if count == 500:
         logging.info("sleep")
         time.sleep(2)
 
@@ -126,9 +129,7 @@ while True:
     me = game.me
     game_map = game.game_map
     simplified_map = [[row[i].halite_amount for row in game_map._cells] for i in range(len(game_map._cells[0]))]
-    #quadrant = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
-    #logging.info(np.matrix(simplified_map))
-
+    quadrant_map = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
 
 
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
