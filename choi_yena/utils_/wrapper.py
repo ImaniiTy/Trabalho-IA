@@ -18,7 +18,7 @@ class HaliteGrid(MDP):
         self.width = self.height = parameters.viewDistance * 2 + 1
         self.map_size = len(game_map)
         self.ship_vision = self.constrain_map(game_map)
-        super().__init__((0, 0), actlist=commands_, terminals=[], gamma=parameters.gamma)
+        super().__init__((parameters.viewDistance, parameters.viewDistance), actlist=commands_, terminals=[], gamma=parameters.gamma)
 
     def T(self, state, action):
         if action is None:
@@ -33,8 +33,7 @@ class HaliteGrid(MDP):
             for j, _ in enumerate(row):
                 global_position = self.to_global(i,j)
                 row[j] = map_[global_position[0]][global_position[1]]
-        
-        logging.info("\n{}".format(matrix(constraint)))
+
         return constraint
 
     def setup_data(self):  
@@ -68,6 +67,16 @@ class HaliteGrid(MDP):
     def get_distance(self, from_, to):
         return abs(from_[0] - to[0]) + abs(from_[1] - to[1])
 
+    def debug_rewards(self):
+        rewards = []
+        for i, row in enumerate(self.ship_vision):
+            rewards_row = []
+            for j, _ in enumerate(row):
+                rewards_row.append(self.reward[i, j])
+            
+            rewards.append(rewards_row)
+
+        return rewards
 class VisionGrid(HaliteGrid):
 
     def __init__(self, game_map, ship, unsafe_positions):
@@ -78,14 +87,15 @@ class VisionGrid(HaliteGrid):
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
                 if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
-                    self.reward[i, j] = 10000
+                    self.reward[i, j] = parameters.objective_reward
                 elif self.to_global(i,j) in self.unsafe_positions:
-                    self.reward[i, j] = -10000
+                    self.reward[i, j] = parameters.death_penality
                 else:
                     self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
                 self.states.add((i, j))
 
                 if cell > parameters.maxHaliteToMove:
+                    self.reward[i, j] *= 2
                     self.terminals.append((i, j))
 class QuadrantGrid(HaliteGrid):
     
@@ -101,9 +111,9 @@ class QuadrantGrid(HaliteGrid):
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
                 if (i, j) == objective or ((i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount):
-                    self.reward[i, j] = 10000
+                    self.reward[i, j] = parameters.objective_reward
                 elif self.to_global(i, j) in self.unsafe_positions:
-                    self.reward[i, j] = -10000
+                    self.reward[i, j] = parameters.death_penality
                 else:
                     self.reward[i, j] = cell * -parameters.reward_multiplier
                 self.states.add((i, j))
@@ -137,9 +147,9 @@ class QuadrantGrid(HaliteGrid):
         edges = []
         for i in range(len(self.ship_vision)):
             edges.append((0,i))
-            edges.append((len(self.quadrant_map) - 1,i))
+            edges.append((len(self.ship_vision) - 1,i))
             edges.append((i,0))
-            edges.append((i,len(self.quadrant_map) - 1))
+            edges.append((i,len(self.ship_vision) - 1))
 
         return edges
 
@@ -158,9 +168,9 @@ class ReturnGrid(HaliteGrid):
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
                 if self.to_global(i, j) in self.unsafe_positions:
-                    self.reward[i, j] = -10000
+                    self.reward[i, j] = parameters.death_penality
                 elif (i, j) == objective:
-                    self.reward[i, j] = 10000
+                    self.reward[i, j] = parameters.objective_reward
                 else:
                     self.reward[i, j] = cell * -parameters.reward_multiplier
                 self.states.add((i, j))

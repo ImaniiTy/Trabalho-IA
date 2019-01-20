@@ -62,6 +62,8 @@ def handleShipAI(ship):
         if len(grid.terminals) == 0:
             grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions)
 
+    logging.info("Terminais: {}".format(grid.terminals))
+    logging.info("Rewards: \n{}".format(matrix(grid.debug_rewards())))
     # Calcula a MDP
     result = mdp.policy_iteration(grid)
 
@@ -116,12 +118,12 @@ count = 0
 
 """ <<<Game Loop>>> """
 while True:
-
+    '''
     count += 1
     if count == 500:
         logging.info("sleep")
         time.sleep(2)
-
+    '''
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
 
