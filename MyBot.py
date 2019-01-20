@@ -28,7 +28,7 @@ game = choi_yena.hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
 # As soon as you call "ready" function below, the 2 second per turn timer will start.
-game.ready("MyPythonBot")
+game.ready("Choi Yena Bot")
 
 # Now that your bot is initialized, save a message to yourself in the log file with some important information.
 #   Here, you log here your id, which you can always fetch from the game object by using my_id.
@@ -63,7 +63,7 @@ def handleShipAI(ship):
             grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions, enemy_positions)
 
     logging.info("Terminais: {}".format(grid.terminals))
-    logging.info("Rewards: \n{}".format(matrix(grid.debug_rewards())))
+    logging.info("Rewards: \n{}".format(grid.debug_rewards()))
     # Calcula a MDP
     result = mdp.policy_iteration(grid)
 
@@ -154,14 +154,15 @@ while True:
         unsafe_positions.append(wrapper.to_tuple(me.shipyard.position))
         command_queue.append(me.shipyard.spawn())
 
+    if constants.MAX_TURNS - game.turn_number <= 30:
+        for ship_id, _ in ship_status.items():
+            ship_status[ship_id] = "returning"
     # Handle ship AI
     time1 = time.time()
     for ship in my_ships:
         
         handleShipAI(ship)
-        
-        
-        
+
     time2 = time.time()
 
     logging.info("Time: {}".format(time2 - time1))

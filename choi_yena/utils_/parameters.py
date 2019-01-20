@@ -8,5 +8,5 @@ min_halite_multiplier = 2.5
 maxHaliteToReturn = 850
 death_penality = -3000
 enemy_multiplier = 1.3
-objective_reward = 6000
+objective_reward = 5000
 gamma = .9
