@@ -56,11 +56,11 @@ def handleShipAI(ship):
     # Decide qual tipo de MDP usar
     if ship_status[ship.id] == "returning":
         logging.info("Returning")
-        grid = wrapper.ReturnGrid(simplified_map, ship, unsafe_positions, wrapper.to_tuple(me.shipyard.position))
+        grid = wrapper.ReturnGrid(simplified_map, ship, unsafe_positions, enemy_positions, wrapper.to_tuple(me.shipyard.position))
     else:
-        grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions)
+        grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions, enemy_positions)
         if len(grid.terminals) == 0:
-            grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions)
+            grid = wrapper.QuadrantGrid(simplified_map, quadrant_map, ship, unsafe_positions, enemy_positions)
 
     logging.info("Terminais: {}".format(grid.terminals))
     logging.info("Rewards: \n{}".format(matrix(grid.debug_rewards())))
@@ -142,6 +142,7 @@ while True:
 
     my_ships = me.get_ships()
     enemy_ships = fetch_enemy()
+    enemy_positions = [wrapper.to_tuple(enemy.position) for enemy in enemy_ships]
 
     my_ships.sort(key = sortByPriority)
 
@@ -149,7 +150,7 @@ while True:
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
-    if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
+    if len(my_ships) <= parameters.ship_amount + (constants.HEIGHT - 32) / 2 and game.turn_number < parameters.max_turn_to_spawn and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
         unsafe_positions.append(wrapper.to_tuple(me.shipyard.position))
         command_queue.append(me.shipyard.spawn())
 

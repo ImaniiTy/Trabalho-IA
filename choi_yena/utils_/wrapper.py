@@ -11,13 +11,14 @@ commands_ = ['n','s','e','w','o']
 
 class HaliteGrid(MDP):
 
-    def __init__(self, game_map, ship, unsafe_positions):
+    def __init__(self, game_map, ship, unsafe_positions, enemy_positions):
         self.ship = ship
         self.center = (self.ship.position.x, self.ship.position.y)
         self.unsafe_positions = unsafe_positions
         self.width = self.height = parameters.viewDistance * 2 + 1
         self.map_size = len(game_map)
         self.ship_vision = self.constrain_map(game_map)
+        self.enemy_positions = enemy_positions
         super().__init__((parameters.viewDistance, parameters.viewDistance), actlist=commands_, terminals=[], gamma=parameters.gamma)
 
     def T(self, state, action):
@@ -79,28 +80,28 @@ class HaliteGrid(MDP):
         return rewards
 class VisionGrid(HaliteGrid):
 
-    def __init__(self, game_map, ship, unsafe_positions):
-        super().__init__(game_map, ship, unsafe_positions)
+    def __init__(self, game_map, ship, unsafe_positions, enemy_positions):
+        super().__init__(game_map, ship, unsafe_positions, enemy_positions)
         self.setup_data()
 
     def setup_data(self):
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
-                if (i, j) == (parameters.viewDistance, parameters.viewDistance) and cell * 0.1 > self.ship.halite_amount:
+                if (i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount:
                     self.reward[i, j] = parameters.objective_reward
-                elif self.to_global(i,j) in self.unsafe_positions:
-                    self.reward[i, j] = parameters.death_penality
+                elif self.to_global(i, j) in self.unsafe_positions:
+                    self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier if self.to_global(i, j) in self.enemy_positions else parameters.death_penality
                 else:
                     self.reward[i, j] = (cell - parameters.maxHaliteToMove) * parameters.reward_multiplier
                 self.states.add((i, j))
 
                 if cell > parameters.maxHaliteToMove:
-                    self.reward[i, j] *= 2
+                    self.reward[i, j] *= parameters.terminal_multiplier
                     self.terminals.append((i, j))
 class QuadrantGrid(HaliteGrid):
     
-    def __init__(self, game_map, quadrant_map, ship, unsafe_positions):
-        super().__init__(game_map,ship,unsafe_positions)
+    def __init__(self, game_map, quadrant_map, ship, unsafe_positions, enemy_positions):
+        super().__init__(game_map,ship,unsafe_positions, enemy_positions)
         self.quadrant_map = quadrant_map
         self.my_location = (int(self.center[0] / len(quadrant_map)), int(self.center[1] / len(quadrant_map)))
         self.setup_data()
@@ -113,7 +114,7 @@ class QuadrantGrid(HaliteGrid):
                 if (i, j) == objective or ((i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount):
                     self.reward[i, j] = parameters.objective_reward
                 elif self.to_global(i, j) in self.unsafe_positions:
-                    self.reward[i, j] = parameters.death_penality
+                    self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier if self.to_global(i, j) in self.enemy_positions else parameters.death_penality
                 else:
                     self.reward[i, j] = cell * -parameters.reward_multiplier
                 self.states.add((i, j))
@@ -157,9 +158,9 @@ class QuadrantGrid(HaliteGrid):
         return ((quadrant[0] * len(self.quadrant_map) + parameters.viewDistance) % self.map_size, (quadrant[1] * len(self.quadrant_map) + parameters.viewDistance) % self.map_size)
 
 class ReturnGrid(HaliteGrid):
-    def __init__(self, game_map, ship, unsafe_positions, drop_location):
+    def __init__(self, game_map, ship, unsafe_positions, enemy_positions, drop_location):
         self.drop_location = drop_location
-        super().__init__(game_map, ship, unsafe_positions)
+        super().__init__(game_map, ship, unsafe_positions, enemy_positions)
         self.setup_data()
 
     def setup_data(self):
@@ -168,7 +169,7 @@ class ReturnGrid(HaliteGrid):
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
                 if self.to_global(i, j) in self.unsafe_positions:
-                    self.reward[i, j] = parameters.death_penality
+                    self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier if self.to_global(i, j) in self.enemy_positions else parameters.death_penality
                 elif (i, j) == objective:
                     self.reward[i, j] = parameters.objective_reward
                 else:
