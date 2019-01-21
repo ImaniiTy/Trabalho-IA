@@ -38,8 +38,6 @@ logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 ship_status = {}
 
 ships_priority = []
-retuning_queue = []
-
 
 def handleShipAI(ship):
     if ship.id not in ship_status:
@@ -52,16 +50,13 @@ def handleShipAI(ship):
             ship_status[ship.id] = "exploring"
     elif ship.halite_amount >= parameters.maxHaliteToReturn:
         ship_status[ship.id] = "returning"
-        retuning_queue.append(ship.id)
     # Decision making
     grid = None
 
     # Decide qual tipo de MDP usar
     if ship_status[ship.id] == "returning":
         logging.info("Returning")
-        grid = wrapper.ReturnGrid(simplified_map, ship, unsafe_positions, enemy_positions, [wrapper.to_tuple(me.shipyard.position)])
-    elif ship_status[ship.id] == "recalling":
-        grid = wrapper.RecallGrid(simplified_map, ship, unsafe_positions, enemy_positions, [wrapper.to_tuple(me.shipyard.position)])
+        grid = wrapper.ReturnGrid(simplified_map, ship, unsafe_positions, enemy_positions, wrapper.to_tuple(me.shipyard.position))
     else:
         grid = wrapper.VisionGrid(simplified_map,ship,unsafe_positions, enemy_positions)
         if len(grid.terminals) == 0:
@@ -117,17 +112,19 @@ def fetch_enemy():
     return enemy_ships_
 
 def sortByPriority(item):
-    if item.id in retuning_queue:
-        return game_map.calculate_distance(me.shipyard.position, item.position)
-    elif item.id in ships_priority:
-        return 501
-    else:
-        return 502
+    return item.id not in ships_priority
 
 count = 0
 
 """ <<<Game Loop>>> """
 while True:
+
+    count += 1
+    if count == 400:
+        f = open("halite.txt" , "w+")
+        f.write(f"{me.halite_amount}\n")
+        f.close()
+
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
 
@@ -137,6 +134,7 @@ while True:
     me = game.me
     game_map = game.game_map
     simplified_map = [[row[i].halite_amount for row in game_map._cells] for i in range(len(game_map._cells[0]))]
+    quadrant_map = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
 
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
@@ -146,28 +144,27 @@ while True:
     my_ships = me.get_ships()
     enemy_ships = fetch_enemy()
     enemy_positions = [wrapper.to_tuple(enemy.position) for enemy in enemy_ships]
-    
 
     my_ships.sort(key = sortByPriority)
 
     unsafe_positions = [wrapper.to_tuple(ship.position) for ship in enemy_ships + my_ships]
 
-    quadrant_map = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
+    # If the game is in the first 200 turns and you have enough halite, spawn a ship.
+    # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
+    if len(my_ships) <= parameters.ship_amount + (constants.HEIGHT - 32) / 2 and game.turn_number < parameters.max_turn_to_spawn and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
+        unsafe_positions.append(wrapper.to_tuple(me.shipyard.position))
+        command_queue.append(me.shipyard.spawn())
 
     if constants.MAX_TURNS - game.turn_number <= 30:
         for ship_id, _ in ship_status.items():
-            ship_status[ship_id] = "recalling"
-
+            ship_status[ship_id] = "returning"
     # Handle ship AI
     time1 = time.time()
     for ship in my_ships:
+
         handleShipAI(ship)
 
     time2 = time.time()
-
-    if len(my_ships) <= parameters.ship_amount + (constants.HEIGHT - 32) / 1.5 and game.turn_number < parameters.max_turn_to_spawn + (constants.MAX_TURNS - 400) / 2 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and not wrapper.to_tuple(me.shipyard.position) in unsafe_positions:
-        unsafe_positions.append(wrapper.to_tuple(me.shipyard.position))
-        command_queue.append(me.shipyard.spawn())
 
     logging.info("Time: {}".format(time2 - time1))
 
