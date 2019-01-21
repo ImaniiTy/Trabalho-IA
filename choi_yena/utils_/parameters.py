@@ -1,11 +1,11 @@
-viewDistance = 2
+viewDistance = 4
 reward_multiplier = 10
-terminal_multiplier = 120
-ship_amount = 7
-maxHaliteToMove = 12
-max_turn_to_spawn = 317
+terminal_multiplier = 5
+ship_amount = 24
+maxHaliteToMove = 40
+max_turn_to_spawn = 283
 min_halite_multiplier = 8
-maxHaliteToReturn = 665
+maxHaliteToReturn = 850
 death_penality = -9352
 enemy_multiplier = 2
 objective_reward = 4803

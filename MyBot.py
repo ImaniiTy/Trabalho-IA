@@ -127,12 +127,6 @@ count = 0
 
 """ <<<Game Loop>>> """
 while True:
-    '''
-    count += 1
-    if count == 200:
-        logging.info("sleep")
-        time.sleep(2)
-    '''
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
 
@@ -158,9 +152,6 @@ while True:
     unsafe_positions = [wrapper.to_tuple(ship.position) for ship in enemy_ships + my_ships]
 
     quadrant_map = quadrants.quadrantGenerator(simplified_map, constants.WIDTH)
-    
-    # If the game is in the first 200 turns and you have enough halite, spawn a ship.
-    # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
 
     if constants.MAX_TURNS - game.turn_number <= 30:
         for ship_id, _ in ship_status.items():
