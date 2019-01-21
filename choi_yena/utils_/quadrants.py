@@ -12,3 +12,4 @@ def quadrantGenerator(origin, width):
                         if(origin[(j+x*vD)%width][(i+y*vD)%width] > parameters.maxHaliteToMove):
                             quadrant[x][y] += origin[(j+x*vD)%width][(i+y*vD)%width]
     return quadrant
+    

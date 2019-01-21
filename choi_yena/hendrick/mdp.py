@@ -143,6 +143,7 @@ def policy_iteration(mdp):
     "Solve an MDP by policy iteration [Figure 17.7]"
     U = {s: 0 for s in mdp.states}
     pi = {s: random.choice(mdp.actions(s)) for s in mdp.states}
+    count = 0
     while True:
         U = policy_evaluation(pi, U, mdp)
         unchanged = True
@@ -151,11 +152,13 @@ def policy_iteration(mdp):
             if a != pi[s]:
                 pi[s] = a
                 unchanged = False
-        if unchanged:
+        if unchanged or count == 8:
+            logging.info("Count MDP: {}".format(count))
             return pi
+        count += 1
 
 
-def policy_evaluation(pi, U, mdp, k=20):
+def policy_evaluation(pi, U, mdp, k=10):
     """Return an updated utility mapping U from each state in the MDP to its
     utility, using an approximation (modified policy iteration)."""
     R, T, gamma = mdp.R, mdp.T, mdp.gamma

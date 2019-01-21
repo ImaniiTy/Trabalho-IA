@@ -12,6 +12,8 @@
 # End of https://www.gitignore.io/api/visualstudiocode
 
 # Ignore Logs and Replays
+old_bot/*
 output/*
 *.log
 *.hlt
+*.zip

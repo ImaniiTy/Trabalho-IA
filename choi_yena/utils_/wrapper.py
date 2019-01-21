@@ -1,4 +1,5 @@
 import logging
+import operator
 
 from numpy import matrix
 from choi_yena import hlt
@@ -14,6 +15,7 @@ class HaliteGrid(MDP):
     def __init__(self, game_map, ship, unsafe_positions, enemy_positions):
         self.ship = ship
         self.center = (self.ship.position.x, self.ship.position.y)
+        self.local_center = (parameters.viewDistance, parameters.viewDistance)
         self.unsafe_positions = unsafe_positions
         self.width = self.height = parameters.viewDistance * 2 + 1
         self.map_size = len(game_map)
@@ -103,34 +105,53 @@ class QuadrantGrid(HaliteGrid):
     def __init__(self, game_map, quadrant_map, ship, unsafe_positions, enemy_positions):
         super().__init__(game_map,ship,unsafe_positions, enemy_positions)
         self.quadrant_map = quadrant_map
+        self.choosed_quadrant = (0, 0)
         self.my_location = (int(self.center[0] / len(quadrant_map)), int(self.center[1] / len(quadrant_map)))
         self.setup_data()
 
     def setup_data(self):
         objective = self.set_direction()
+        self.choosed_quadrant = objective
         logging.info("Objective: {}".format(objective))
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
-                if (i, j) == objective or ((i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount):
+                '''
+                if (i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount:
+                    self.reward[i, j] = parameters.objective_reward
+                elif (i, j) == objective:
                     self.reward[i, j] = parameters.objective_reward
                 elif self.to_global(i, j) in self.unsafe_positions:
                     self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier if self.to_global(i, j) in self.enemy_positions else parameters.death_penality
                 else:
                     self.reward[i, j] = cell * -parameters.reward_multiplier
+                '''
+                if self.to_global(i, j) in self.unsafe_positions:
+                    if (i, j) == objective:
+                        self.reward[i, j] = parameters.objective_reward
+                    elif self.to_global(i, j) in self.enemy_positions:
+                        self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier
+                    else:
+                        self.reward[i, j] = parameters.death_penality
+                else:
+                    if (i, j) == objective:
+                        self.reward[i, j] = parameters.objective_reward * parameters.terminal_multiplier
+                    elif (i, j) == (parameters.viewDistance, parameters.viewDistance) and int(cell * 0.1) > self.ship.halite_amount:
+                        self.reward[i, j] = parameters.objective_reward
+                    else:
+                        self.reward[i, j] = 0
                 self.states.add((i, j))
 
         self.terminals.append(objective)
     
     def set_direction(self):
         edges = self.get_edges()
-        closest_quadrant = self.get_closest()
-        global_closest_quadrant = self.quadrant_to_global(closest_quadrant)
+        global_closest_quadrant = self.quadrant_to_global(self.get_best())
 
         smallest_distance_edge = edges[0]
         for edge in edges:
             global_edge = self.to_global(edge[0], edge[1])
             global_smallest_distance_edge = self.to_global(smallest_distance_edge[0], smallest_distance_edge[1])
-            if self.get_distance(global_edge, global_closest_quadrant) < self.get_distance(global_smallest_distance_edge, global_closest_quadrant):
+            if self.get_distance(global_edge, global_closest_quadrant) <= self.get_distance(global_smallest_distance_edge, global_closest_quadrant):
                 smallest_distance_edge = edge
         
         return smallest_distance_edge
@@ -144,6 +165,19 @@ class QuadrantGrid(HaliteGrid):
         
         return closest_quadrant
 
+    def get_best(self):
+        best_quadrant = (0, 0)
+        for i, row in enumerate(self.quadrant_map):
+            for j, cell in enumerate(row):
+                if cell > 0 and (i, j) != self.my_location:
+                    best_quadrant_amount = self.quadrant_map[best_quadrant[0]][best_quadrant[1]]
+                    current_distance = 1 if self.get_distance(self.center, self.quadrant_to_global((i, j))) == 0 else self.get_distance(self.center, self.quadrant_to_global((i, j))) * parameters.distance_multiplier
+                    best_distance = 1 if self.get_distance(self.center, self.quadrant_to_global(best_quadrant)) == 0 else self.get_distance(self.center, self.quadrant_to_global(best_quadrant)) * parameters.distance_multiplier
+                    if cell / current_distance > best_quadrant_amount / best_distance:
+                        best_quadrant = (i, j)
+
+        return best_quadrant
+    
     def get_edges(self):
         edges = []
         for i in range(len(self.ship_vision)):
@@ -155,25 +189,93 @@ class QuadrantGrid(HaliteGrid):
         return edges
 
     def quadrant_to_global(self, quadrant):
-        return ((quadrant[0] * len(self.quadrant_map) + parameters.viewDistance) % self.map_size, (quadrant[1] * len(self.quadrant_map) + parameters.viewDistance) % self.map_size)
+        return ((quadrant[0] * len(self.quadrant_map) % self.map_size + parameters.viewDistance) , (quadrant[1] * len(self.quadrant_map) % self.map_size + parameters.viewDistance))
 
 class ReturnGrid(HaliteGrid):
-    def __init__(self, game_map, ship, unsafe_positions, enemy_positions, drop_location):
-        self.drop_location = drop_location
+    def __init__(self, game_map, ship, unsafe_positions, enemy_positions, drop_list):
         super().__init__(game_map, ship, unsafe_positions, enemy_positions)
+        self.drop_location = self.get_closest_drop(drop_list)
         self.setup_data()
 
     def setup_data(self):
-        objective = self.get_objective()
-        logging.info("Unsafe: {}".format(self.unsafe_positions))
+        objective = (0, 0)
+        if self.get_distance(self.center, self.drop_location) > 1:
+            objective = self.get_objective(self.get_avaible_spot())
+        else:
+            objective = self.get_objective(self.drop_location)
+        
         for i, row in enumerate(self.ship_vision):
             for j, cell in enumerate(row):
                 if self.to_global(i, j) in self.unsafe_positions:
-                    self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier if self.to_global(i, j) in self.enemy_positions else parameters.death_penality
+                    if (i, j) == objective:
+                        if self.tuple_to_global(objective) == self.drop_location and self.tuple_to_global(objective) in self.enemy_positions:
+                            self.reward[i, j] = parameters.objective_reward
+                        else:
+                            self.reward[i, j] = parameters.death_penality
+                    else:
+                        self.reward[i, j] = parameters.death_penality * parameters.enemy_multiplier if self.to_global(i, j) in self.enemy_positions else parameters.death_penality
                 elif (i, j) == objective:
                     self.reward[i, j] = parameters.objective_reward
                 else:
                     self.reward[i, j] = cell * -parameters.reward_multiplier
+                self.states.add((i, j))
+        if self.get_distance(self.center, (self.drop_location[0] + 1, self.drop_location[1])) == 0 or self.get_distance(self.center, (self.drop_location[0] - 1, self.drop_location[1])):
+            self.reward[self.local_center[0], self.local_center[1]] = parameters.reward_multiplier / 2
+        self.terminals.append(objective)
+
+    def get_closest_drop(self, drop_list):
+        closest = drop_list[0]
+
+        for drop in drop_list:
+            if self.get_distance(self.center, drop) < self.get_distance(self.center, closest):
+                closest = drop
+
+        return closest
+    
+    def get_avaible_spot(self):
+        edges = [(self.drop_location[0] + 1, self.drop_location[1]), (self.drop_location[0] - 1, self.drop_location[1])]
+        
+        closest_edge = self.get_closest_drop(edges)
+        sub = tuple(map(operator.sub, closest_edge, self.drop_location))
+        i = 0
+        while True:
+            offset = tuple(map(operator.mul, sub, (i, i)))
+            result = tuple(map(operator.add, closest_edge, offset))
+            logging.info("offset: {}".format(result))
+            if result not in self.unsafe_positions:
+                return result
+            
+            i += 1
+
+
+    def get_objective(self, global_objective):
+        objective = (0, 0)
+        for i, row in enumerate(self.ship_vision):
+            for j, _ in enumerate(row):
+                if self.get_distance(self.to_global(i, j), global_objective) < self.get_distance(self.tuple_to_global(objective), global_objective):
+                    objective = (i, j)
+        
+        return objective
+
+class RecallGrid(HaliteGrid):
+    def __init__(self, game_map, ship, unsafe_positions, enemy_positions, drop_list):
+        super().__init__(game_map, ship, unsafe_positions, enemy_positions)
+        self.drop_location = self.get_closest_drop(drop_list)
+        self.setup_data()
+
+    def setup_data(self):
+        objective = self.get_objective()
+        for i, row in enumerate(self.ship_vision):
+            for j, _ in enumerate(row):
+                if self.to_global(i, j) in self.unsafe_positions:
+                    if (i, j) == objective:
+                        self.reward[i, j] = parameters.objective_reward / 3
+                    else:
+                        self.reward[i, j] = parameters.death_penality / 3
+                elif (i, j) == objective:
+                    self.reward[i, j] = parameters.objective_reward
+                else:
+                    self.reward[i, j] = 0
                 self.states.add((i, j))
 
         self.terminals.append(objective)
@@ -187,6 +289,15 @@ class ReturnGrid(HaliteGrid):
         
         return objective
 
+    def get_closest_drop(self, drop_list):
+        closest = drop_list[0]
+
+        for drop in drop_list:
+            if self.get_distance(self.center, drop) < self.get_distance(self.center, closest):
+                closest = drop
+
+        return closest
+        
 
 # Utility functions
 def parseResult(ship, game_map, mdp, mdpResult):
