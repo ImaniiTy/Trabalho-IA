@@ -10,7 +10,7 @@ from choi_yena.hlt import constants
 # Your library
 from choi_yena.utils_ import wrapper
 from choi_yena.hendrick import mdp
-from choi_yena.utils_ import final_parameters
+from choi_yena.utils_ import parameters
 from choi_yena.utils_ import quadrants
 
 # Logging allows you to save messages for yourself. This is required because the regular STDOUT
@@ -39,7 +39,6 @@ ship_status = {}
 
 ships_priority = []
 
-
 def handleShipAI(ship):
     if ship.id not in ship_status:
         ship_status[ship.id] = "exploring"
@@ -49,7 +48,7 @@ def handleShipAI(ship):
     if ship_status[ship.id] == "returning":
         if ship.position == me.shipyard.position:
             ship_status[ship.id] = "exploring"
-    elif ship.halite_amount >= final_parameters.maxHaliteToReturn:
+    elif ship.halite_amount >= parameters.maxHaliteToReturn:
         ship_status[ship.id] = "returning"
     # Decision making
     grid = None
@@ -119,12 +118,13 @@ count = 0
 
 """ <<<Game Loop>>> """
 while True:
-    '''
+
     count += 1
-    if count == 500:
-        logging.info("sleep")
-        time.sleep(2)
-    '''
+    if count == 400:
+        f = open("halite.txt" , "w+")
+        f.write(f"{me.halite_amount}\n")
+        f.close()
+
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
 
@@ -151,7 +151,7 @@ while True:
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
-    if len(my_ships) <= final_parameters.ship_amount + (constants.HEIGHT - 32) / 2 and game.turn_number < final_parameters.max_turn_to_spawn and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
+    if len(my_ships) <= parameters.ship_amount + (constants.HEIGHT - 32) / 2 and game.turn_number < parameters.max_turn_to_spawn and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
         unsafe_positions.append(wrapper.to_tuple(me.shipyard.position))
         command_queue.append(me.shipyard.spawn())
 
